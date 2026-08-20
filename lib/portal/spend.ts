@@ -201,11 +201,3 @@ export async function pendingSpendRequests(db: DB, guildId: string) {
     .orderBy(desc(schema.spendRequests.createdAt));
 }
 
-/** Everything, for the history panel. */
-export async function spendRequestsFor(db: DB, guildId: string) {
-  return db
-    .select()
-    .from(schema.spendRequests)
-    .where(eq(schema.spendRequests.guildId, guildId))
-    .orderBy(desc(schema.spendRequests.createdAt));
-}

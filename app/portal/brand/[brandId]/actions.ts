@@ -71,3 +71,40 @@ export async function sendBrandMessageAction(form: FormData): Promise<void> {
   revalidatePath(`/portal/brand/${brandId}/messages`);
   redirect(`/portal/brand/${brandId}/messages`);
 }
+
+/**
+ * B8 — on a **draft**, a brand may change the start week. Only the week.
+ *
+ * ===== THE PAGE DESCRIBED THIS CONTROL AND THERE WAS NO CONTROL =====
+ *
+ * `challenges/page.tsx`'s header has said *"the control below is a week picker
+ * for that reason"* since Sprint 13, and `changeStartWeek` had no caller
+ * anywhere (`94-export-reach`). So B8 was a rule enforced by a function nothing
+ * could reach, described by a page that showed nothing.
+ *
+ * Everything this may refuse is refused **in** `changeStartWeek` — not theirs,
+ * already scheduled, not a week boundary, a week that has started. This reads
+ * the form and carries the refusal back, because a picker that pre-filtered its
+ * own options would be a second opinion about which weeks are sellable.
+ */
+export async function changeStartWeekAction(form: FormData): Promise<void> {
+  const brandId = String(form.get("brandId"));
+  await requireBrandPortal(brandId);
+  const db = await getDb();
+
+  const { changeStartWeek } = await import("../../../../lib/portal/brand.ts");
+  const weekStart = new Date(String(form.get("weekStart") ?? ""));
+  const to = `/portal/brand/${brandId}/challenges`;
+
+  if (Number.isNaN(weekStart.getTime())) {
+    redirect(`${to}?error=${encodeURIComponent("Pick one of the weeks offered.")}`);
+  }
+  try {
+    await changeStartWeek(db, String(form.get("challengeId") ?? ""), brandId, weekStart);
+  } catch (e) {
+    if (e instanceof BuilderRefused) redirect(`${to}?error=${encodeURIComponent(e.message)}`);
+    throw e;
+  }
+  revalidatePath(to);
+  redirect(`${to}?moved=1`);
+}

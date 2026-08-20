@@ -1001,3 +1001,85 @@ because it is reading the same answer the pool reads.
    import is there — and a guard reading raw source would flag the explanation.
    `withoutComments` moved to `tests/helpers/source.ts` rather than being
    declared a second time (house rule 4).
+
+---
+
+## 32 · A guard that proves a pure function proves nothing about the wiring
+
+**What happened.** The slash-command guard was written as six assertions on
+`commandFrame`, the router that turns `/cluster` into a screen. Every one
+passed. Then the **entire `ApplicationCommand` branch** was deleted from the
+interaction handler — the actual defect, restored — and all six stayed green.
+
+They proved a function. Nothing asked whether anything calls it.
+
+**Why it is trap 8 wearing a new coat.** The break applied perfectly and the
+suite could not see it, because the suite's subject was one level below where
+the defect lived. That is the same shape as `94-export-reach`'s whole subject:
+*written, correct, called by nothing.* A guard for that defect that itself only
+tested a function was the defect, in the test.
+
+**The fix.** One command driven end to end through the real handler, with the
+screen it lands on **observed** — a probe registered over `search`, restored
+afterwards. Break the branch now and the assertion reports the defect's own
+symptom: *"That screen has gone. Try `/cluster` and start again."*
+
+**Carry this:** when a guard's subject is "X is wired to Y", at least one
+assertion must go through the wire. A pure-function assertion beside it is
+worth having and is never sufficient.
+
+---
+
+## 33 · A guard reading raw source flags its own explanation
+
+**What happened.** Five separate times this sprint, a source-walking guard went
+red on a comment that described the thing it bans.
+
+| Guard | Went red on |
+|---|---|
+| `97-editable`'s "no page draws a card of its own" | `/api/uploads`'s comment *"a card is 1200×630"* |
+| `97-profile`'s "no `<style>` tag" | the profile view's header saying it writes none |
+| `97-profile`'s "never `background-attachment: fixed`" | the same header saying it never does |
+| `02-structural`'s payment-detail scan | a comment quoting the pattern that had just been fixed |
+| `97-copy-rule` | `lib/content/validate.ts` holding the banned phrases **as data** |
+
+**The rule.** `withoutComments` before scanning. A comment may explain that a
+rule was deleted; rendered code may not state it. `tests/helpers/source.ts`
+holds the one copy (house rule 4).
+
+**And the one that was not a false positive.** `97-copy-rule`'s hit was real:
+the validator needed the deleted model's phrases in order to refuse an operator
+typing them, and a list of those phrases in `lib/` **is** a rendered surface
+stating the deleted model. The answer was not an exemption — it was moving the
+list into `lib/identity/attribution.ts`, the module that owns the rule. N3
+applied to the list of what N3 bans: **the rule's words belong to the rule, the
+same way its numbers do.**
+
+---
+
+## 34 · "A test is not a caller" cuts both ways, and the second cut is the useful one
+
+**What happened.** `94-export-reach` found 144 exported functions with no caller
+outside their own module. Twelve of them had exactly one caller anywhere and it
+was a test.
+
+The tempting reading is *"these are tested, so they are fine"*. The correct one
+is that a test calling something nothing else calls is a test **holding a
+feature open** — and it is precisely how three modules stayed invisible for
+three sprints before `94-surface-reach` was written.
+
+**What the twelve turned out to be.** Not one was simply redundant:
+
+| | |
+|---|---|
+| `freezeOnUnlink` | B6's rule — freeze a score when a gamer unlinks. **There was no unlink action anywhere on the platform.** A rule with no trigger |
+| `refreshGuild` | `/admin/servers/[guildId]` had printed the cooldown for the Refresh button since Sprint 12. No button |
+| `editTrophy` | `/admin/trophies` said *"name, image and brand are editable forever"*. No editor |
+| `reverseSweep` | `/admin/vaults/prize` said *"it is reversible"*. No way to reverse one |
+| `changeStartWeek` | the brand's challenges page said *"the control below is a week picker"*. No control |
+| `awaitingReplyCounts` | MS1's whole point is that silence is the failure mode. The number was on no page |
+| `mapAdminRole` | a **second** implementation of S5 with a looser regex than the live one — `^\d+$` against `^\d{5,}$`. The unused copy was the permissive one |
+
+**Carry this:** a page that describes a control it does not have is the same
+defect as a function with no caller, seen from the other side. Four of the five
+above were found by reading the page's own words back to it.

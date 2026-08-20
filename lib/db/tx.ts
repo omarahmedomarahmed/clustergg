@@ -155,8 +155,5 @@ export async function lockGamer(tx: Tx, userId: string): Promise<boolean> {
   return list.length > 0;
 }
 
-/** True when the pooled driver is genuinely a different connection to the same data. */
-export const pooledDriverInUse = () => !isDemoMode;
-
 // Re-exported so a money path imports one module rather than three.
 export { eq, schema };

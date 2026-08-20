@@ -73,5 +73,3 @@ export function authSecret(): string {
   );
 }
 
-/** The same key, encoded the way `jose` wants it. */
-export const authSecretKey = () => new TextEncoder().encode(authSecret());

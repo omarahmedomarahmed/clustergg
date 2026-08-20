@@ -14,7 +14,6 @@ import {
   conversation,
   inbox,
   isAwaitingReply,
-  markRead,
   MessageRefused,
   postMessage,
   threadFor,
@@ -59,18 +58,24 @@ test("an unanswered thread keeps alerting, however long it takes", async () => {
 test("reading is not answering", async () => {
   // ===== THE MOST PLAUSIBLE EDIT ANYBODY WILL EVER MAKE TO THIS FILE =====
   //
-  // A `markRead` that cleared the alert reads like an obvious improvement, and
-  // it turns H7 into its exact opposite: the threads that would stop alerting
-  // are the ones somebody opened, meant to answer, and did not.
+  // Marking a thread read and clearing the alert with it reads like an obvious
+  // improvement, and it turns H7 into its exact opposite: the threads that
+  // would stop alerting are the ones somebody opened, meant to answer, and did
+  // not.
+  //
+  // `markRead` was deleted this sprint — it wrote `readAt` stamps that nothing
+  // read, and its only caller was this test. **The property survives it**, and
+  // is now asserted the way it actually has to hold: the alert is derived from
+  // `lastAuthorKind`, so there is no read state anywhere that could clear it.
   const db = await resetDemoDb();
   await aGuild(db);
   const threadId = await threadFor(db, { side: "server", guildId: "g1" }, NOW);
   await postMessage(db, { threadId, authorKind: "server", body: "Are you there?" }, NOW);
 
-  const read = await markRead(db, threadId, later(1));
-  eq(read, 1, "admin opened it");
+  // Opening it is a read query and nothing else. That is the point: there is
+  // no write here to get the rule wrong with.
   const messages = await conversation(db, threadId);
-  ok(messages[0].readAt !== null, "and the message knows it was read");
+  eq(messages.length, 1, "admin opened it and saw the question");
 
   const rows = await inbox(db, "server", later(2));
   ok(rows[0].awaitingReply, "and it is still alerting, because nobody answered");

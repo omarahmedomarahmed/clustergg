@@ -135,14 +135,6 @@ export async function brandSignIn(
   return { ok: true, brandUserId: row.id, brandId: row.brandId };
 }
 
-export async function brandUserById(db: DB, brandUserId: string) {
-  const [row] = await db
-    .select()
-    .from(schema.brandUsers)
-    .where(eq(schema.brandUsers.id, brandUserId));
-  return row ?? null;
-}
-
 /** Every brand user for a brand — the admin view, and the invite-state check. */
 export async function brandUsersFor(db: DB, brandId: string) {
   return db
@@ -151,12 +143,3 @@ export async function brandUsersFor(db: DB, brandId: string) {
     .where(eq(schema.brandUsers.brandId, brandId));
 }
 
-/**
- * Whether a brand has actually arrived, as opposed to merely being invited.
- *
- * Read off `inviteRedeemedAt` — the same timestamp B1 keys on, so "arrived"
- * and "the invite is dead" can never disagree.
- */
-export async function brandHasArrived(db: DB, brandId: string): Promise<boolean> {
-  return (await brandUsersFor(db, brandId)).some((u) => u.inviteRedeemedAt !== null);
-}

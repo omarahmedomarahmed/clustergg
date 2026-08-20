@@ -199,20 +199,3 @@ export async function totalOf(db: DB, invoiceId: string): Promise<number> {
   return row?.total ?? 0;
 }
 
-/** Every ledger row attached to one thing, for an admin who asks "why". */
-export async function entriesFor(
-  db: DB,
-  refType: string,
-  refIds: string[],
-): Promise<schema.VaultLedgerRow[]> {
-  if (refIds.length === 0) return [];
-  return db
-    .select()
-    .from(schema.vaultLedger)
-    .where(
-      and(
-        eq(schema.vaultLedger.refType, refType),
-        inArray(schema.vaultLedger.refId, refIds),
-      ),
-    );
-}

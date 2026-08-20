@@ -366,10 +366,3 @@ export async function runDailyJobs(db: DB, now = new Date()) {
   return { gun, close, settled, movements: movements.length, announced, pool };
 }
 
-/** Challenges whose window has opened but which were never announced. */
-export async function missedTheGun(db: DB, now = new Date()) {
-  return db
-    .select()
-    .from(schema.challenges)
-    .where(and(eq(schema.challenges.state, "scheduled"), lt(schema.challenges.startAt, now)));
-}

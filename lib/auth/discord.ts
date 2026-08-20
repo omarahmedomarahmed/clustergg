@@ -205,7 +205,3 @@ export async function fetchGuilds(accessToken: string): Promise<DiscordGuildSumm
   }));
 }
 
-/** The servers they could install into: they admin it, or Discord says they own it. */
-export function installableGuilds(guilds: DiscordGuildSummary[]): DiscordGuildSummary[] {
-  return guilds.filter((g) => g.owner || hasAdministrator(g.permissions));
-}

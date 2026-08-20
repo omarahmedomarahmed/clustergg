@@ -10,7 +10,7 @@ import { checkPrizeVault } from "../../../../lib/money/prize-vault.ts";
 import { vaultSearch } from "../../../../lib/admin/dashboard.ts";
 import { formatMoney, TROPHY_HOLD_YEARS } from "../../../../lib/money/amounts.ts";
 import { Panel, Money, Row, Light, Empty } from "../../components.tsx";
-import { sweepAction } from "../../actions.ts";
+import { sweepAction, reverseSweepAction } from "../../actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -25,6 +25,33 @@ export default async function PrizeVault({
   const db = await getDb();
 
   const check = await checkPrizeVault(db);
+
+  // ===== `sweepDueAt` IS SHOWN, NOT RECOMPUTED =====
+  //
+  // The date a holding became sweepable is what makes a reversal a judgement
+  // rather than a guess: an expiry sweep that fired the day it was due is a
+  // different thing from one that fired years late. Read from the module that
+  // decides it — a second calculation here would be a second answer to "was
+  // this sweep in time".
+  const { sweepDueAt } = await import("../../../../lib/trophies/settle.ts");
+  const sweptRows = await db
+    .select({
+      id: schema.userTrophies.id,
+      sweptAt: schema.userTrophies.sweptAt,
+      sweptReason: schema.userTrophies.sweptReason,
+      trophyName: schema.trophies.name,
+      valueCents: schema.trophies.valueCents,
+      holderName: schema.users.displayName,
+    })
+    .from(schema.userTrophies)
+    .innerJoin(schema.trophies, eq(schema.userTrophies.trophyId, schema.trophies.id))
+    .innerJoin(schema.users, eq(schema.userTrophies.userId, schema.users.id))
+    .where(sql`${schema.userTrophies.sweptAt} is not null`)
+    .orderBy(desc(schema.userTrophies.sweptAt))
+    .limit(50);
+  const swept = await Promise.all(
+    sweptRows.map(async (r) => ({ ...r, dueAt: await sweepDueAt(db, r.id) })),
+  );
   const results = query ? await vaultSearch(db, query) : [];
 
   // Every money-trophy, with its holder count. Not a total.
@@ -174,6 +201,56 @@ export default async function PrizeVault({
             </button>
           </form>
         </div>
+      </Panel>
+
+      {/*
+        ===== THE REVERSAL THE PANEL ABOVE HAS BEEN PROMISING =====
+
+        That panel has said "it is reversible" since Sprint 9 and there was no
+        way to reverse one — `reverseSweep` was written, guarded, and called by
+        nothing. A sweep with no reversal is a one-way door on somebody's money.
+
+        One button per holding, never a bulk undo: a sweep runs over a whole
+        category, and a reversal is a person looking at one trophy and deciding
+        it was wrong.
+      */}
+      <Panel title="Swept, and reversible">
+        <p className="text-sm text-mute">
+          A swept trophy is still the gamer&apos;s. The money was parked, and
+          putting it back is one press — logged against you, like the sweep was.
+        </p>
+        {swept.length === 0 ? (
+          <Empty>Nothing has been swept.</Empty>
+        ) : (
+          <div className="mt-3 flex flex-col">
+            {swept.map((s) => (
+              <Row key={s.id}>
+                <div className="flex w-full items-center justify-between gap-4">
+                  <div>
+                    <p className="text-sm" data-testid="swept-row">
+                      {s.trophyName} · <Money cents={s.valueCents} />
+                    </p>
+                    <p className="mt-0.5 text-xs text-mute">
+                      {s.holderName} · swept {s.sweptAt?.toISOString().slice(0, 10)} ·{" "}
+                      {s.sweptReason ?? "no reason recorded"}
+                      {s.dueAt ? ` · became sweepable ${s.dueAt.toISOString().slice(0, 10)}` : ""}
+                    </p>
+                  </div>
+                  <form action={reverseSweepAction}>
+                    <input type="hidden" name="userTrophyId" value={s.id} />
+                    <button
+                      type="submit"
+                      className="rounded-lg border border-line px-3 py-1.5 text-sm hover:border-accent"
+                      data-testid="reverse-sweep"
+                    >
+                      Put it back
+                    </button>
+                  </form>
+                </div>
+              </Row>
+            ))}
+          </div>
+        )}
       </Panel>
     </div>
   );

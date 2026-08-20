@@ -229,11 +229,40 @@ and pushed; everything below is unstarted.
 | 14 · Proof | **Done** — except the one line only a person can sign: a human clicking all four journeys |
 | 15 · Production readiness | **Done** — the platform is up. Four owner actions remain, listed below |
 | 15b · Copy states the current rule | **Done** — the attribution sentence is generated, and three live pages were saying the deleted model |
+| 16 · Delivery, and the editable surface | **Done** — the launch blocker is closed, and `94-export-reach` found 146 |
+| **17 · The design pass** | Not started. `13-DESIGN` in full: palette, typography, `/pool` first, the logo, the OG image, game art, trophy art |
+| **18 · The unexport pass** | Not started. See below — 64 exports that should never have been exports |
 
-**447 tests, 2,638 assertions, 223 guards proven by breaking, 34 of 34
+**517 tests, 3,115 assertions, 285 guards proven by breaking, 34 of 34
 mutations caught, typecheck gating the band inside `npm test`.** Band 1 is entirely green, and so
 is band 2 — now **four** passes, each run twice back to back (trap 14), against
 `next build` + `next start` rather than the dev server.
+
+#### Sprint 18 · the unexport pass, and why it is its own sprint
+
+`94-export-reach` (L12) was committed red on **144** exported functions in
+`lib/` with no caller outside their own module. The owner ruled on every one:
+
+| Ruling | Count | Where it went |
+|---|---|---|
+| Dead code — delete | 28 | Gone |
+| A deleted credential's key verification | 5 | Gone with `lib/core/portal-auth.ts`, whose live half is now `lib/core/signing.ts` |
+| Called only by its own tests — *a test is not a caller* | 12 | Each either gained the surface it was waiting for, or went with its test rewritten against the live path |
+| Genuinely internal — the export is the mistake | **64** | **Deferred to this sprint** |
+
+The 64 are in `NOT_YET_CALLED` in `tests/band1/94-export-reach.test.ts`, and the
+allowance is self-expiring in both directions: an entry fails the band when it
+**gains** a caller and when it **loses** its function. Both halves are proven by
+breaking (guards 289–290).
+
+**The work is mechanical and the churn is the reason it is separate:** sixty-four
+files lose an `export` keyword and about twenty test files stop importing what
+they should never have imported. Doing it inside a delivery sprint would put
+that diff beside the money path, which is the one place a large mechanical diff
+should never be.
+
+Three of the sixty-four are `lib/providers/mlbb.ts` and are a different case:
+the provider is now marked `notLive`, the code stays, and the entry says so.
 
 #### What Sprint 14 has closed so far
 

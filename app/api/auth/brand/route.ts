@@ -6,13 +6,13 @@
 //
 // A Route Handler because each one writes a cookie, which a Server Component
 // render may not. That constraint is written up at length in
-// `lib/core/portal-auth.ts`: the version that granted during its own render
+// `lib/core/signing.ts`: the version that granted during its own render
 // crashed on a **correct** credential and quietly showed the locked view on a
 // wrong one, so the bug only appeared on success.
 
 import { NextResponse, type NextRequest } from "next/server";
 import { getDb } from "../../../../lib/db/index.ts";
-import { grantPortalSession } from "../../../../lib/core/portal-auth.ts";
+import { grantPortalSession } from "../../../../lib/core/signing.ts";
 import {
   redeemBrandInvite,
   brandSignIn,

@@ -13,6 +13,7 @@
 // C2 — a document that quotes a rate is a rate we are held to by whoever read
 // it.
 
+import { attributionSentence } from "../identity/attribution.ts";
 import {
   CHALLENGE_PRICE_CENTS,
   COMMUNITY_TIERS,
@@ -115,6 +116,23 @@ function ownerRules(): Rule[] {
         "fields answered. Both are checked once, when Monday's gun fires, and never " +
         "re-checked mid-week. What the pool page shows on Wednesday is what pays on " +
         "Friday.",
+    },
+    {
+      // ===== THE LONG FORM OF THE ATTRIBUTION RULE, GENERATED =====
+      //
+      // N3, and the reason `attributionSentence` exists: the sentence is an
+      // **output of** the rule rather than a description of it. It had no
+      // caller (`94-export-reach`) — only the short form under a KPI heading
+      // did — so the one place a server owner could read the whole rule was
+      // nowhere.
+      //
+      // This is the audience that needs it. An owner's entire income depends
+      // on which of two servers is credited for a gamer, and a paraphrase is
+      // what goes stale first: the third case, "when both are the same server
+      // it earns 1.0, not two halves", is the clause a retyped version always
+      // drops.
+      heading: "Which server a gamer earns for",
+      body: attributionSentence(),
     },
     {
       heading: "How the pool divides",

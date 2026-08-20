@@ -103,24 +103,26 @@ export async function observationsAsAt(
   return out;
 }
 
-/**
- * Stamp a participant's baseline.
- *
- * B1 — the caller forces a sync first and this reads the result. A stale
- * reading becomes free progress: whatever they played between the last sync
- * and joining would land inside the challenge window.
- */
-export async function stampBaseline(
-  db: DB,
-  participantId: string,
-  at: Date,
-  values: Baseline,
-): Promise<void> {
-  await db
-    .update(schema.challengeParticipants)
-    .set({ baselineAt: at, baseline: values })
-    .where(eq(schema.challengeParticipants.id, participantId));
-}
+// ===== `stampBaseline` WAS DELETED HERE, AND THE INVESTIGATION SAID WHY =====
+//
+// It was a fourth way to write `baselineAt` and nothing called it.
+//
+// The question asked was whether the gun is the only path. **It is not** —
+// there are two live ones, and neither went through this function:
+//
+//   * `lib/challenges/entry.ts` stamps at join, in the same INSERT that creates
+//     the participant, for anybody joining a challenge that is already live.
+//   * `lib/challenges/jobs.ts` stamps at the gun (`stampBaselinesAtGun`) for
+//     everybody who joined early, dated at the challenge's start rather than at
+//     the instant the job ran.
+//
+// So the reason to delete it is stronger than "unused". Its own doc carried
+// B1 — *"the caller forces a sync first; a stale reading becomes free
+// progress"* — as an instruction to whoever called it, and a rule stated as an
+// instruction to a caller that does not exist is a rule enforced by nobody.
+// Both live paths call `forceSync` immediately before stamping
+// (`entry.ts:202`, `jobs.ts:63`), so B1 holds where it is actually applied,
+// and this was a way to stamp a baseline with that rule attached to a comment.
 
 /**
  * A participant's live score.

@@ -62,13 +62,6 @@ export async function createInvoice(
   return id;
 }
 
-export async function issueInvoice(db: DB, invoiceId: string): Promise<void> {
-  await db
-    .update(schema.invoices)
-    .set({ status: "issued", issuedAt: new Date() })
-    .where(eq(schema.invoices.id, invoiceId));
-}
-
 /**
  * Mark an invoice paid, and route the money. The only path into a vault.
  *

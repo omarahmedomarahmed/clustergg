@@ -24,6 +24,7 @@ import { publicServers } from "../../lib/site/queries.ts";
 import { liveCopy } from "../../lib/content/store.ts";
 import { getDb } from "../../lib/db/index.ts";
 import { pageArtFor } from "../../lib/site/page-art.ts";
+import { isPlaceholder } from "../../lib/site/assets.ts";
 import { Nav, Empty, PageArtLayer, Art } from "../components.tsx";
 
 export const dynamic = "force-dynamic";
@@ -74,11 +75,27 @@ export default async function ServersPage() {
                   image on the platform to disappear: they chose it, they host
                   nothing, and they can delete it.
                 */}
-                <Art
-                  src={s.coverImageUrl}
-                  alt={`${s.name}'s cover`}
-                  className="h-32 w-full object-cover"
-                />
+                <div className="relative">
+                  <Art
+                    src={s.coverImageUrl}
+                    alt={`${s.name}'s cover`}
+                    className="h-32 w-full object-cover"
+                  />
+                  {/*
+                    D23's other half, in words. A placeholder that looks like a
+                    design decision is a placeholder nobody ever replaces — and
+                    a server owner scrolling this list is exactly the person who
+                    can fix it.
+                  */}
+                  {isPlaceholder(s.coverImageUrl) ? (
+                    <span
+                      className="absolute bottom-2 right-2 rounded-lg border border-line bg-ink/80 px-2 py-1 text-xs text-mute"
+                      data-testid="cover-missing"
+                    >
+                      No cover image yet
+                    </span>
+                  ) : null}
+                </div>
                 <div className="flex flex-1 flex-col gap-2 p-4">
                   <div className="flex items-baseline justify-between gap-3">
                     <Link href={`/servers/${s.slug}`} className="font-medium hover:underline">

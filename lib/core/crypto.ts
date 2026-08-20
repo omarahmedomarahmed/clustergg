@@ -19,14 +19,6 @@ function key(): Buffer {
   return createHash("sha256").update(`cluster-provider-token ${authSecret()}`).digest();
 }
 
-/** `<iv>.<tag>.<ciphertext>`, all base64url. */
-export function encryptSecret(plain: string): string {
-  const iv = randomBytes(12);
-  const cipher = createCipheriv("aes-256-gcm", key(), iv);
-  const body = Buffer.concat([cipher.update(plain, "utf8"), cipher.final()]);
-  return [iv, cipher.getAuthTag(), body].map((b) => b.toString("base64url")).join(".");
-}
-
 /**
  * The plaintext, or null.
  *

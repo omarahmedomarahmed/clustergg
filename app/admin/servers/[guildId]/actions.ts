@@ -171,3 +171,51 @@ export async function setParentGuildAction(form: FormData): Promise<void> {
   revalidatePath(`/admin/servers/${guildId}`);
   back(guildId, { notice: "Parent server corrected, and logged." });
 }
+
+/**
+ * Refresh what Discord says about this server — owner and roles only.
+ *
+ * ===== THE PAGE SHOWED THE COOLDOWN AND HAD NO BUTTON =====
+ *
+ * `/admin/servers/[guildId]` has imported `refreshAllowedAt` and
+ * `REFRESH_COOLDOWN_MS` since Sprint 12 and printed *"two calls, cooled down
+ * for five minutes"* — describing an action nothing could perform.
+ * `refreshGuild` had no caller (`94-export-reach`).
+ *
+ * G3, and the page says it out loud: this pulls the **owner and the roles**,
+ * never the member list. Who holds a role lives only in the member list, and we
+ * do not read one on any path the product depends on (12 §7). The cooldown is
+ * why it is two calls and not more.
+ */
+export async function refreshGuildAction(form: FormData): Promise<void> {
+  await actor();
+  const guildId = String(form.get("guildId") ?? "");
+  const db = await getDb();
+
+  const { refreshGuild } = await import("../../../../lib/discord/guilds.ts");
+  const rest = await import("../../../../lib/discord/rest.ts");
+
+  const result = await refreshGuild(db, guildId, {
+    guild: async (id) => {
+      const res = await rest.getGuild(id);
+      if (!res.ok) throw new Error(`Discord answered ${res.status}: ${res.error}`);
+      return {
+        ownerId: res.data.owner_id ?? "",
+        name: res.data.name,
+        memberCount: res.data.approximate_member_count,
+      };
+    },
+    roles: async (id) => {
+      const res = await rest.listRoles(id);
+      if (!res.ok) throw new Error(`Discord answered ${res.status}: ${res.error}`);
+      return res.data.map((r) => ({ id: r.id, name: r.name, permissions: "0" }));
+    },
+  }).catch((e) => ({ ok: false as const, reason: (e as Error).message }));
+
+  revalidatePath(`/admin/servers/${guildId}`);
+  back(guildId, {
+    [result.ok ? "notice" : "error"]: result.ok
+      ? "Refreshed from Discord — owner and roles only, never the member list."
+      : result.reason,
+  });
+}

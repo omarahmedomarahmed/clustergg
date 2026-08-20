@@ -28,7 +28,6 @@ import { beginReset, completeReset } from "../../lib/identity/reset.ts";
 import {
   beginEmailVerification,
   confirmEmailVerification,
-  emailIsVerified,
 } from "../../lib/identity/verify.ts";
 import { signUpBrand } from "../../lib/portal/brand.ts";
 import { redeemBrandInvite, brandSignIn } from "../../lib/portal/brand-auth.ts";
@@ -223,14 +222,21 @@ test("the email door's verification is the one redemption requires", async () =>
   const db = await resetDemoDb();
   const userId = await createGamer(db, { displayName: "Verified", email: "v@example.test" });
 
-  no(await emailIsVerified(db, userId), "not verified yet");
+  // ===== ASSERTED ON THE COLUMN `/redeem` ACTUALLY READS =====
+  //
+  // This used to call `emailIsVerified`, a helper whose only caller was this
+  // line — a second way to ask a question `checkEligibility` answers by
+  // reading `users.emailVerifiedAt` directly. One fact, one column, and now
+  // one reader.
+  const [before] = await db.select().from(schema.users).where(sqlEq(schema.users.id, userId));
+  eq(before.emailVerifiedAt, null, "not verified yet");
+
   const code = await beginEmailVerification(db, userId, "v@example.test");
   const result = await confirmEmailVerification(db, userId, code);
   ok(result.ok, "the code verifies");
-  ok(await emailIsVerified(db, userId), "and the address is proven");
 
   const [row] = await db.select().from(schema.users).where(sqlEq(schema.users.id, userId));
-  ok(row.emailVerifiedAt !== null, "recorded on the gamer, which is what /redeem reads");
+  ok(row.emailVerifiedAt !== null, "and it is recorded on the gamer, which is what /redeem reads");
 });
 
 test("a wrong or expired code reads identically", async () => {

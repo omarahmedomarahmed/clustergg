@@ -21,10 +21,20 @@ export default async function AdminDashboard({
   const params = await searchParams;
   const now = demoNow(params);
   const db = await getDb();
-  const [board, inbox, weekend] = await Promise.all([
+  // ===== MS1/H7 — SILENCE IS THE FAILURE MODE, SO IT IS ON THE DASHBOARD ====
+  //
+  // *"A thread whose last message is not from Cluster keeps alerting."*
+  // `awaitingReplyCounts` was written for that and had no caller anywhere
+  // (`94-export-reach`), so the one number the rule exists to produce was
+  // computed by nothing and shown nowhere. A rule about not letting somebody
+  // go unanswered, with no surface, is the rule failing in exactly its own
+  // shape.
+  const { awaitingReplyCounts } = await import("../../lib/messages/threads.ts");
+  const [board, inbox, weekend, awaiting] = await Promise.all([
     dashboard(db, now),
     notifications(db, new Date(now.getTime() - 7 * 86_400_000)),
     weekendChecklist(db, now),
+    awaitingReplyCounts(db),
   ]);
 
   const denied = typeof params.denied === "string" ? params.denied : null;
@@ -33,6 +43,29 @@ export default async function AdminDashboard({
 
   return (
     <div className="flex flex-col gap-6">
+      {awaiting.total > 0 ? (
+        <Panel
+          title={`${awaiting.total} waiting on an answer`}
+          note="A thread whose last message is not from Cluster keeps alerting. Nothing clears it but a reply"
+        >
+          <Row>
+            <div className="flex w-full items-center justify-between gap-4">
+              <p className="text-sm" data-testid="awaiting-reply">
+                {awaiting.server} from servers · {awaiting.brand} from brands
+              </p>
+              <span className="flex gap-3 text-sm">
+                <Link href="/admin/inbox/servers" className="underline">
+                  Servers
+                </Link>
+                <Link href="/admin/inbox/brands" className="underline">
+                  Brands
+                </Link>
+              </span>
+            </div>
+          </Row>
+        </Panel>
+      ) : null}
+
       {denied ? (
         <p
           data-testid="access-denied"

@@ -84,35 +84,3 @@ export function slugify(input: string): string {
     .replace(/-+$/, "");
 }
 
-/**
- * `slugify` with a domain-appropriate fallback, for the places that need one.
- *
- * The fallback is a REQUIRED argument. Every previous default was a global
- * "gamer", which is how a Discord server came to be published at
- * `/servers/gamer`, and a default that is right for one caller is silently
- * wrong for the next.
- */
-export function slugifyOr(input: string, fallback: string): string {
-  return slugify(input) || slugify(fallback) || "x";
-}
-
-export function timeAgo(date: Date | string | null | undefined): string {
-  if (!date) return "";
-  const d = typeof date === "string" ? new Date(date) : date;
-  const s = Math.floor((Date.now() - d.getTime()) / 1000);
-  if (s < 60) return "just now";
-  if (s < 3600) return `${Math.floor(s / 60)}m ago`;
-  if (s < 86400) return `${Math.floor(s / 3600)}h ago`;
-  if (s < 604800) return `${Math.floor(s / 86400)}d ago`;
-  return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
-}
-
-export function fmtNum(n: number | null | undefined): string {
-  if (n == null) return "—";
-  if (Number.isInteger(n)) return n.toLocaleString("en-US");
-  return n.toLocaleString("en-US", { maximumFractionDigits: 2 });
-}
-
-export function clamp(n: number, min: number, max: number) {
-  return Math.max(min, Math.min(max, n));
-}

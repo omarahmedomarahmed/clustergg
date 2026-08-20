@@ -8,7 +8,7 @@
 // Signed rather than stored, so it survives a cold start and needs no table.
 // The payload is not secret; what matters is that it cannot be forged.
 
-import { signPayload, verifyPayload } from "../core/portal-auth.ts";
+import { signPayload, verifyPayload } from "../core/signing.ts";
 
 export type OAuthState = {
   /** `signin` | `link` | `install` | `guilds` */

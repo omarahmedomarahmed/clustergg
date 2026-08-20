@@ -3,6 +3,7 @@ import { desc, eq, sql } from "drizzle-orm";
 import { getDb, schema } from "../../../lib/db/index.ts";
 import { formatMoney } from "../../../lib/money/amounts.ts";
 import { Panel, Empty } from "../components.tsx";
+import { editTrophyAction } from "../actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -40,10 +41,41 @@ export default async function AdminTrophies() {
                   key={trophy.id}
                   className="flex items-center justify-between border-b border-line py-3 last:border-0"
                 >
-                  <Link href={`/trophies/${trophy.id}`} className="text-sm hover:underline">
-                    {trophy.name}
-                  </Link>
+                  {/*
+                    The editor the paragraph above has been promising. `editTrophy`
+                    had no caller, so "name, image and brand are editable forever"
+                    was true of the function and of nothing a human could reach.
+
+                    No value field, and there never will be one: T8 — a $100
+                    trophy is a $100 trophy forever, because the prize vault is
+                    holding exactly that much against it.
+                  */}
+                  <form action={editTrophyAction} className="flex flex-1 items-center gap-2">
+                    <input type="hidden" name="trophyId" value={trophy.id} />
+                    <input
+                      name="name"
+                      defaultValue={trophy.name}
+                      className="w-48 rounded-md border border-line bg-ink px-2 py-1 text-sm"
+                      data-testid="trophy-name"
+                    />
+                    <input
+                      name="imageUrl"
+                      defaultValue={trophy.imageUrl ?? ""}
+                      placeholder="image URL"
+                      className="w-48 rounded-md border border-line bg-ink px-2 py-1 text-xs"
+                    />
+                    <button
+                      type="submit"
+                      className="rounded-md border border-line px-2 py-1 text-xs hover:bg-white/5"
+                      data-testid="trophy-save"
+                    >
+                      Save
+                    </button>
+                  </form>
                   <span className="flex items-center gap-6 text-sm">
+                    <Link href={`/trophies/${trophy.id}`} className="text-xs text-mute hover:underline">
+                      view
+                    </Link>
                     <span className="text-xs text-mute">
                       {holders} holder{holders === 1 ? "" : "s"}
                     </span>

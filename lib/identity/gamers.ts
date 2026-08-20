@@ -250,11 +250,6 @@ export async function setCountry(
     .where(eq(schema.users.id, userId));
 }
 
-export async function gamerById(db: DB, userId: string) {
-  const [row] = await db.select().from(schema.users).where(eq(schema.users.id, userId));
-  return row ?? null;
-}
-
 export async function gamerByDiscordId(db: DB, discordId: string) {
   const [row] = await db
     .select()

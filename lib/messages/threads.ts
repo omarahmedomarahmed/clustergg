@@ -145,36 +145,6 @@ export function isAwaitingReply(thread: {
   return thread.lastAuthorKind !== "cluster";
 }
 
-/**
- * Mark what admin has looked at. **This does not answer anything.**
- *
- * Kept deliberately separate from the alert, and named for what it is. A
- * `markRead` that cleared the alert would be the single most plausible edit
- * anybody makes to this file, and it would turn H7 into its opposite: the
- * threads that stop alerting would be exactly the ones somebody opened,
- * intended to answer, and did not.
- */
-export async function markRead(
-  db: DB,
-  threadId: string,
-  now = new Date(),
-): Promise<number> {
-  // Counted by selecting first rather than from the driver's `rowCount`, which
-  // the in-process database does not report — and a count that is silently
-  // always zero is a return value nobody can assert on.
-  const unread = await db
-    .select({ id: schema.messages.id })
-    .from(schema.messages)
-    .where(and(eq(schema.messages.threadId, threadId), isNull(schema.messages.readAt)));
-  if (unread.length === 0) return 0;
-
-  await db
-    .update(schema.messages)
-    .set({ readAt: now })
-    .where(and(eq(schema.messages.threadId, threadId), isNull(schema.messages.readAt)));
-  return unread.length;
-}
-
 export type InboxRow = {
   threadId: string;
   side: ThreadSide;

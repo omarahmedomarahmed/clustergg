@@ -18,7 +18,7 @@ import {
   SCREENS,
   type ScreenResult,
 } from "../../lib/discord/interactions.ts";
-import { checkAdmin, ownerOnly, mapAdminRole } from "../../lib/discord/admin.ts";
+import { checkAdmin } from "../../lib/discord/admin.ts";
 import {
   frame,
   navId,
@@ -360,13 +360,21 @@ test("the admin role is stored by ID, so renaming it revokes nothing", async () 
     memberCount: 500,
   });
 
+  // ===== S5 IS ASSERTED WHERE IT IS ACTUALLY ENFORCED =====
+  //
+  // This used to drive `mapAdminRole`, an export whose only caller was this
+  // line. It was also a **second implementation** of the rule with a looser
+  // regex than the live one — `^\d+$` against `setOwnerContact`'s `^\d{5,}$`
+  // — so the two disagreed about whether "1" is a role ID. K12's exact shape,
+  // and the unused copy was the permissive one.
+  const { setOwnerContact } = await import("../../lib/portal/owner.ts");
   await throws(
-    () => mapAdminRole(db, "g1", "Moderators"),
-    /not an ID/,
+    () => setOwnerContact(db, "g1", { adminRoleId: "Moderators" }),
+    /not a role ID/,
     "a name is refused — that is the whole rule",
   );
 
-  await mapAdminRole(db, "g1", "112233445566");
+  await setOwnerContact(db, "g1", { adminRoleId: "112233445566" });
   const allowed = await checkAdmin(db, {
     guildId: "g1",
     memberRoleIds: ["999", "112233445566"],
@@ -425,12 +433,22 @@ test("an owner card is never a public message, including its refusal", async () 
     adminRoleId: "112233445566",
   });
 
-  // A screen that deliberately forgets to be ephemeral. The wrapper is what
-  // makes S8 true, so that a screen cannot forget it.
-  const card = ownerOnly(async () => ({ content: "Your vault holds $87.50" }));
+  // ===== S8, ASSERTED ON A REAL OWNER CARD =====
+  //
+  // This used to build a throwaway screen and wrap it in `ownerOnly` — an
+  // export whose only caller was this line, and a second wrapper beside the one
+  // the bot actually uses (`adminCard`, in `screens/server.ts`). Proving a
+  // wrapper works says nothing about whether the cards go through it.
+  //
+  // So it drives a **registered** owner card instead. `serverwallet` is the
+  // sharpest one: it names a server's money, and S8 says it is never a public
+  // message, including its refusal — a refusal posted publicly announces to a
+  // whole server that somebody tried.
+  await import("../../lib/discord/screens/index.ts");
+  const card = SCREENS.get("serverwallet")!;
+  ok(card !== undefined, "the wallet card is registered");
 
   const allowed = await card({
-    db,
     interaction: {
       id: "i",
       token: "t",
@@ -439,11 +457,15 @@ test("an owner card is never a public message, including its refusal", async () 
       guild_id: "g1",
       member: { user: { id: "u1", username: "Admin" }, roles: ["112233445566"] },
     },
+    frame: frame("serverwallet"),
+    trail: [],
+    userId: "u1",
+    guildId: "g1",
+    presser: { userId: null, discordId: "u1", guildId: "g1", roleIds: ["112233445566"], created: false, blocked: false },
   });
-  ok(allowed.ephemeral, "the card is private even though the screen did not say so");
+  ok(allowed.ephemeral, "the card is private, and no screen had to remember to say so");
 
   const refused = await card({
-    db,
     interaction: {
       id: "i",
       token: "t",
@@ -452,6 +474,11 @@ test("an owner card is never a public message, including its refusal", async () 
       guild_id: "g1",
       member: { user: { id: "u2", username: "Member" }, roles: [] },
     },
+    frame: frame("serverwallet"),
+    trail: [],
+    userId: "u2",
+    guildId: "g1",
+    presser: { userId: null, discordId: "u2", guildId: "g1", roleIds: [], created: false, blocked: false },
   });
   ok(refused.ephemeral, "and so is the refusal — a public one announces that somebody tried");
   no(/vault/.test(refused.content ?? ""), "which of course says nothing about the vault");

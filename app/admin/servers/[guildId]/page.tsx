@@ -26,6 +26,7 @@ import {
   setAgeBandAction,
   setParentGuildAction,
   warnBeforeReassignmentAction,
+  refreshGuildAction,
 } from "./actions.ts";
 
 export const dynamic = "force-dynamic";
@@ -384,6 +385,21 @@ export default async function GuildRegistryPage({
           Two calls, cooled down for {Math.round(REFRESH_COOLDOWN_MS / 60000)} minutes.
           {refreshAllowedAt(null) ? "" : ""}
         </p>
+        {/*
+          The button this paragraph has been describing since Sprint 12.
+          `refreshGuild` had no caller, so the page printed a cooldown for an
+          action nothing could perform.
+        */}
+        <form action={refreshGuildAction} className="mt-3">
+          <input type="hidden" name="guildId" value={guildId} />
+          <button
+            type="submit"
+            className={BTN}
+            data-testid="refresh-guild"
+          >
+            Refresh from Discord
+          </button>
+        </form>
       </Panel>
 
       {/* 7 · Analytics */}

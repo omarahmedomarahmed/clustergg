@@ -1941,3 +1941,36 @@ day somebody edits the homepage the search result still says the old thing.
 Imported now — the code default rather than the live store, because metadata is
 read on every page and a content-store round trip for a meta tag is a query on
 every request for a sentence nobody sees.
+
+## Sprint 16 · carrying out the rulings on the 144
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 286 | **A portal session is scoped by cookie NAME, not only by signature** (`92-portal-screens`) | — | rewritten to observe what `grantPortalSession` actually writes into the jar, rather than calling a cookie-name helper whose only caller was that line. The old version proved a helper agreed with itself | — |
+| 287 | **A half-onboarded gamer cannot enter, and the refusal names the step** (`10-onboarding`, U1) | — | rewritten to drive `enterChallenge`. The old version drove `requireUnlocked`, a second implementation of the gate that the entry chain never called — and the suite's own header said it did | — |
+| 288 | **S8 on a real registered owner card** (`60-bot`) | — | drives `SCREENS.get("serverwallet")` rather than wrapping a throwaway screen in `ownerOnly`. Proving a wrapper works says nothing about whether the cards go through it | — |
+| 289 | **An excused entry that gains a caller fails the band** (`94-export-reach`, L13) | added a caller for `allCountries` | the orphan list no longer matches the allowance, naming the new caller's file | clean, 5/5 |
+| 290 | **An excused entry that loses its function fails the band** (`94-export-reach`, L13) | deleted `allCountries` | *"is excused from needing a caller and no longer exists"* | clean |
+| 291 | **B6 has a trigger** (`40-challenges`, and the unlink action) | — | `freezeOnUnlink` had no caller because **there was no way to unlink an account anywhere on the platform**. The freeze runs before the delete and is not fenced: once the link row is gone the score cannot be derived from anything | — |
+
+### The rulings, carried out
+
+| Ruling | Count | What happened |
+|---|---|---|
+| Delete the dead | 28 | Gone |
+| Delete `portal-auth.ts` entirely | 5 exports + the file | The signing half is `lib/core/signing.ts`. S1's reasoning applied to a filename: a file called `portal-auth` is an invitation to put the credential back |
+| Build the buttons | 5 | `/admin/servers/[guildId]` is no longer read-only: warn, reassign, confirm, arbitrate, and A8's parent correction |
+| The queue screen | 2 | `/admin/queue`, which `10-SETUP` §8's outage table has been pointing at since Sprint 15 |
+| `requireUnlocked` | delete | K12 — the entry chain calls `unlockState` and builds a better refusal. The file's header claimed the opposite |
+| `stampBaseline` | investigated, then deleted | The gun is **not** the only path — `entry.ts` stamps at join too, and neither went through it. Its doc carried B1 as an instruction to a caller that did not exist; both live paths call `forceSync` first |
+| MLBB | marked `notLive` | The platform can **decrypt** a session token nothing can ever have encrypted. Three exports stay, with the reason in the allowance |
+| `reverseSweep` / `sweepDueAt` | built | The page had said *"it is reversible"* since Sprint 9 |
+| Defer the 62 | 64 in the allowance | Sprint 18. See `docs/PLAN.md` §2.0 |
+
+### What deleting dead code found that was not dead
+
+`getGuild` and `listRoles` were deleted as unreferenced and came straight back:
+they are exactly what `refreshGuild` needs, and building the Refresh button
+revived them. **They were not dead code — they were the other half of an
+unwired feature**, which is the distinction the guard's list exists to force
+somebody to make, and it is only visible once you try to build the surface.

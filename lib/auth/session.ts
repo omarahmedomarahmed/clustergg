@@ -124,7 +124,3 @@ export async function endSession(db: DB, cookie: string | null | undefined): Pro
   if (id) await db.delete(schema.sessions).where(eq(schema.sessions.id, id));
 }
 
-/** Housekeeping for the daily job. Expired sessions are rows, not secrets. */
-export async function purgeExpiredSessions(db: DB): Promise<void> {
-  await db.delete(schema.sessions).where(lt(schema.sessions.expiresAt, new Date()));
-}

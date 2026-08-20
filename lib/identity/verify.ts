@@ -144,16 +144,3 @@ export async function confirmEmailVerification(
   return { ok: false, reason: refusal };
 }
 
-/**
- * Is this gamer's address already proven?
- *
- * The question `/redeem` asks, and the reason it may never ask for an address
- * at all: an email gamer proved theirs at signup.
- */
-export async function emailIsVerified(db: DB, userId: string): Promise<boolean> {
-  const [row] = await db
-    .select({ verifiedAt: schema.users.emailVerifiedAt })
-    .from(schema.users)
-    .where(eq(schema.users.id, userId));
-  return Boolean(row?.verifiedAt);
-}

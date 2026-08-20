@@ -420,6 +420,25 @@ const DECLARED: ProviderDef[] = [
   {
     id: "mobile-legends", name: "Mobile Legends", game: "Mobile Legends", glyph: "🛡", color: "#f0a500",
     authType: "vc", envVars: ["MLBB_API_BASE"], linkFlow: "vc",
+    // ===== NOT LIVE, AND THE REASON IS STRUCTURAL RATHER THAN A KEY =====
+    //
+    // `94-export-reach` found `lib/providers/mlbb.ts`'s three functions —
+    // `isMlbbConfigured`, `sendVerificationCode`, `login` — with no caller
+    // anywhere, and `encryptSecret` with none either. The consequence is worth
+    // stating exactly: `lib/providers/adapters.ts:746` **decrypts** a stored
+    // MLBB session token, and nothing on this platform can ever have encrypted
+    // one. The link flow does not exist.
+    //
+    // Marked the same way VALORANT is, for the same reason `notLive` was added
+    // on arrival: `isProviderLive` asks whether the keys are configured, and
+    // for both of these that question has the wrong answer. Setting
+    // `MLBB_API_BASE` would make this read as sellable, and a brand who bought
+    // a Mobile Legends week would find out at sync time, which is the worst
+    // possible moment.
+    notLive:
+      "The in-game verification link flow is not wired: nothing calls the login " +
+      "or the code-send, so no gamer can link an account. Building it is a sprint " +
+      "of its own, and until then a challenge on this game is unsellable.",
     identifierLabel: "Player ID + Server (Zone) ID",
     identifierHint: "Found in-game under Profile — e.g. ID 12345678 (1234)", phase: 3,
     docsUrl: "https://github.com/ridwaanhall/api-mobilelegends",
@@ -456,23 +475,6 @@ export const PROVIDERS: ProviderDef[] = (globalThis.__clusterProviders ??= DECLA
 
 export function getProvider(providerId: string): ProviderDef | undefined {
   return PROVIDERS.find((p) => p.id === providerId);
-}
-
-/**
- * The provider that can actually LINK a game account, if any.
- *
- * One definition, because three places used to answer this separately and one
- * of them disagreed: the bot offered a "Link my VALORANT account" button built
- * from the games catalog, while the press handler resolved providers with the
- * `identityOnly` filter — and VALORANT is identity-only, because VAL-* stats
- * need Riot production approval. So the button existed and did nothing.
- *
- * Accepts a game name or a provider id, since callers have one or the other.
- */
-export function linkableProvider(game: string): ProviderDef | null {
-  const q = (game ?? "").trim().toLowerCase();
-  if (!q) return null;
-  return PROVIDERS.find((p) => !p.identityOnly && (p.game.toLowerCase() === q || p.id.toLowerCase() === q)) ?? null;
 }
 
 /**

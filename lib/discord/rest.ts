@@ -103,12 +103,29 @@ export type Guild = { id: string; name: string; icon?: string | null; owner_id?:
 export type Channel = { id: string; name?: string; type: number; guild_id?: string };
 export type Message = { id: string; channel_id: string };
 
-export function guildIconUrl(g: Pick<Guild, "id" | "icon">): string | null {
-  return g.icon ? `https://cdn.discordapp.com/icons/${g.id}/${g.icon}.png?size=256` : null;
-}
+export type Role = { id: string; name: string; color?: number; position?: number };
 
+/**
+ * One guild, as Discord sees it right now.
+ *
+ * ===== DELETED AS DEAD, AND RESTORED WITH ITS SURFACE =====
+ *
+ * `94-export-reach` listed this with no caller and it was deleted — correctly,
+ * on the information available. It came back the moment the registry's Refresh
+ * button was built, because `refreshGuild` needs exactly this and
+ * `listRoles` below: the two were not dead code, they were **the other half of
+ * an unwired feature**, which is the distinction the guard's list exists to
+ * force somebody to make.
+ *
+ * G3 — owner and roles. Never the member list.
+ */
 export function getGuild(guildId: string) {
   return call<Guild>(`/guilds/${guildId}?with_counts=true`);
+}
+
+/** The roles on a guild, for the admin-role mapping (S5). */
+export function listRoles(guildId: string) {
+  return call<Role[]>(`/guilds/${guildId}/roles`);
 }
 
 export function listChannels(guildId: string) {
@@ -159,90 +176,11 @@ export function createChannel(
 
 // ===== Roles =====
 
-export type Role = { id: string; name: string; color?: number; position?: number };
-
-export function listRoles(guildId: string) {
-  return call<Role[]>(`/guilds/${guildId}/roles`);
-}
-
-export function createRole(guildId: string, name: string, color?: number, hoist = false) {
-  return call<Role>(`/guilds/${guildId}/roles`, {
-    method: "POST",
-    body: JSON.stringify({ name, ...(color != null ? { color } : {}), hoist, mentionable: false }),
-  });
-}
-
-// Find the bot's channel, creating it only if it isn't already there. Servers
-// that renamed or pre-created it are respected.
-export async function ensureChannel(guildId: string, name: string, topic?: string): Promise<Channel | null> {
-  const existing = await listChannels(guildId);
-  if (existing.ok) {
-    const found = existing.data.find((c) => c.type === 0 && c.name?.toLowerCase() === name.toLowerCase());
-    if (found) return found;
-  }
-  const made = await createChannel(guildId, name, topic);
-  return made.ok ? made.data : null;
-}
-
-// Discord normalises text channel names to lowercase-with-dashes; categories
-// and voice channels keep their case. Compare the way Discord stores them or
-// a second run creates duplicates of everything.
-export function sameChannelName(a: string | undefined, b: string): boolean {
-  const norm = (s: string) => s.trim().toLowerCase().replace(/\s+/g, "-");
-  return !!a && norm(a) === norm(b);
-}
 
 // ===== Messages =====
 
 export function postMessage(channelId: string, payload: Json) {
   return call<Message>(`/channels/${channelId}/messages`, { method: "POST", body: JSON.stringify(payload) });
-}
-
-export function editMessage(channelId: string, messageId: string, payload: Json) {
-  return call<Message>(`/channels/${channelId}/messages/${messageId}`, { method: "PATCH", body: JSON.stringify(payload) });
-}
-
-// Discord moved pins to /messages/pins/ and kept the old route working. Try the
-// current one, fall back to the legacy one — a failed pin is invisible in the
-// channel (the message is still there), so it must not depend on one route.
-export async function pinMessage(channelId: string, messageId: string): Promise<RestResult<void>> {
-  const res = await call<void>(`/channels/${channelId}/messages/pins/${messageId}`, { method: "PUT" });
-  if (res.ok || res.status !== 404) return res;
-  return call<void>(`/channels/${channelId}/pins/${messageId}`, { method: "PUT" });
-}
-
-// ===== Direct messages =====
-
-// Owner DMs (install welcome, the ladder's earning unlock) go through a one-off
-// DM channel. The number is `EARN_FLOOR` in lib/ladder.ts and is deliberately
-// not repeated here — this comment used to say "500-gamer unlock" (B1).
-/**
- * Put a gamer into a server, using the token THEY granted us.
- *
- * `PUT /guilds/{id}/members/{user}` with a user access token carrying the
- * `guilds.join` scope is the only way to add somebody to a server without them
- * clicking an invite. It is not a way in for us to servers we don't run: the
- * bot must already be in the target guild with Create Invite, and the user must
- * have consented to the scope on the Discord consent screen they just passed.
- *
- * Discord answers 201 when it added them and 204 when they were already there;
- * both are success, and the difference is worth reporting because "we added
- * 400 people today" and "400 people were already there" are different facts.
- */
-export async function addGuildMember(
-  guildId: string, userId: string, accessToken: string,
-): Promise<{ ok: boolean; added: boolean; status: number; error?: string }> {
-  const res = await call<unknown>(`/guilds/${guildId}/members/${userId}`, {
-    method: "PUT",
-    body: JSON.stringify({ access_token: accessToken }),
-  });
-  if (!res.ok) return { ok: false, added: false, status: res.status, error: res.error };
-  // 201 returns the new member object; 204 (already a member) returns nothing.
-  // `call` turns the empty body into `undefined`, which is how the two are
-  // told apart — and they are worth telling apart, because "we added four
-  // hundred people today" and "four hundred were already there" are different
-  // facts about the same successful call.
-  return { ok: true, added: res.data !== undefined, status: res.data === undefined ? 204 : 201 };
 }
 
 /**
@@ -278,14 +216,6 @@ export function registerGlobalCommands(commands: Json[]) {
   const id = appId();
   if (!id) return Promise.resolve({ ok: false as const, status: 0, error: "no_app_id" });
   return call<unknown[]>(`/applications/${id}/commands`, { method: "PUT", body: JSON.stringify(commands) });
-}
-
-// Guild-scoped registration appears INSTANTLY, where global commands can take
-// up to an hour to propagate. Use this while developing against a test server.
-export function registerGuildCommands(guildId: string, commands: Json[]) {
-  const id = appId();
-  if (!id) return Promise.resolve({ ok: false as const, status: 0, error: "no_app_id" });
-  return call<unknown[]>(`/applications/${id}/guilds/${guildId}/commands`, { method: "PUT", body: JSON.stringify(commands) });
 }
 
 export { canAct };

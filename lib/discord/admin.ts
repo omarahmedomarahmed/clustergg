@@ -92,32 +92,6 @@ export async function checkAdmin(
 }
 
 /**
- * Wrap an owner-only screen.
- *
- * Everything this returns is ephemeral, including the refusal — S8 has no
- * exceptions, and a refusal posted publicly would announce to a whole server
- * that somebody tried. The flag is set here rather than by each screen, so a
- * screen cannot forget it.
- */
-export function ownerOnly(
-  handler: (ctx: { interaction: Interaction; db: DB }) => Promise<ScreenResult>,
-): (ctx: { interaction: Interaction; db: DB; guildOwnerId?: string | null }) => Promise<ScreenResult> {
-  return async (ctx) => {
-    const check = await checkAdmin(ctx.db, {
-      guildId: ctx.interaction.guild_id ?? null,
-      memberRoleIds: ctx.interaction.member?.roles ?? [],
-      userId: ctx.interaction.member?.user?.id ?? ctx.interaction.user?.id ?? null,
-      guildOwnerId: ctx.guildOwnerId ?? null,
-    });
-    if (!check.allowed) {
-      return { content: check.reason, ephemeral: true };
-    }
-    const result = await handler(ctx);
-    return { ...result, ephemeral: true };
-  };
-}
-
-/**
  * Have we **seen this person** holding admin on **this guild**?
  *
  * ===== THE PAIR, NOT THE GUILD =====
@@ -153,22 +127,3 @@ export async function hasSeenAdmin(
   return rows.length > 0;
 }
 
-/** Map an admin role. Stores the ID; the name is never persisted. */
-export async function mapAdminRole(
-  db: DB,
-  guildId: string,
-  roleId: string,
-): Promise<void> {
-  if (!/^\d+$/.test(roleId)) {
-    // A Discord snowflake is digits. Anything else is a name somebody typed,
-    // and storing it would be the exact defect S5 forbids.
-    throw new Error(
-      `An admin role is stored by ID, not by name — "${roleId}" is not an ID. ` +
-        `A renamed role must not silently revoke access.`,
-    );
-  }
-  await db
-    .update(schema.guilds)
-    .set({ adminRoleId: roleId })
-    .where(eq(schema.guilds.guildId, guildId));
-}

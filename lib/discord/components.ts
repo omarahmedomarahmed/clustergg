@@ -250,50 +250,6 @@ export function rows(buttons: (Button | null)[]): { type: 1; components: Button[
   return grouped.length <= 5 ? grouped : pack(list);
 }
 
-/**
- * The admin's wording, applied to a finished set of rows.
- *
- * Done here — once, on the way out — rather than at forty call sites, and by
- * matching a button's DEFAULT LABEL rather than by threading a tag through
- * every screen. That keeps the screens readable and has a useful property: a
- * button whose label is generated from live data (a game's name, a gamer's
- * name) never matches, so it is never accidentally reworded by an edit meant
- * for a different button.
- *
- * A hidden button is removed, and a row emptied by that is removed too — an
- * empty action row is a 400 from Discord, which takes the whole message with it.
- */
-export function withButtonCopy(
-  components: unknown[] | undefined,
-  copy: Record<string, { label?: string; emoji?: string; hidden?: boolean }>,
-): unknown[] | undefined {
-  if (!components || !Object.keys(copy).length) return components;
-  const out: unknown[] = [];
-  for (const row of components) {
-    const r = row as { type?: number; components?: unknown[] };
-    if (r?.type !== ComponentType.ActionRow || !Array.isArray(r.components)) { out.push(row); continue; }
-    const kept: unknown[] = [];
-    for (const c of r.components) {
-      const b = c as Button;
-      // Only buttons carry editable copy; a select menu in a row is passed
-      // through untouched.
-      if (b?.type !== ComponentType.Button || typeof b.label !== "string") { kept.push(c); continue; }
-      const edit = copy[b.label];
-      if (!edit) { kept.push(c); continue; }
-      if (edit.hidden) continue;
-      kept.push({
-        ...b,
-        ...(edit.label ? { label: edit.label.slice(0, 80) } : {}),
-        // An emoji is re-validated on the way through: this string came from a
-        // text box, and Discord rejects the entire message over one bad one.
-        ...(edit.emoji ? emojiOf(edit.emoji) : {}),
-      });
-    }
-    if (kept.length) out.push({ ...r, components: kept });
-  }
-  return out;
-}
-
 // ===== Select menus =====
 //
 // A button per option stops working the moment there are more than twenty-five
@@ -341,7 +297,3 @@ export function select(customId: string, options: SelectOption[], opts: {
   };
 }
 
-/** A select occupies a whole action row — it can never share one with a button. */
-export function selectRow(s: Select | null): { type: 1; components: Select[] } | null {
-  return s ? { type: ComponentType.ActionRow, components: [s] } : null;
-}

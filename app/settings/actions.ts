@@ -8,7 +8,8 @@
 // screen.
 
 import { redirect } from "next/navigation";
-import { getDb } from "../../lib/db/index.ts";
+import { revalidatePath } from "next/cache";
+import { getDb, schema } from "../../lib/db/index.ts";
 import { currentGamer, signOut } from "../../lib/auth/current.ts";
 import { deleteAccount, DeletionRefused } from "../../lib/identity/gamers.ts";
 
@@ -45,4 +46,59 @@ export async function deleteAccountAction(form: FormData): Promise<void> {
 
   await signOut();
   redirect("/goodbye?closed=1");
+}
+
+/**
+ * Unlink a game account. B6, and the action that rule was waiting for.
+ *
+ * ===== THE RULE EXISTED AND THE ACTION DID NOT =====
+ *
+ * `freezeOnUnlink` implements B6 — *freeze a participant's score when they
+ * unlink the account they entered with; they stay in the standings, because
+ * dropping them rewrites a leaderboard other people have been watching.*
+ * `94-export-reach` found it with no caller, and the reason turned out to be
+ * that **there was no way to unlink an account anywhere on the platform.** A
+ * rule with no trigger is not a safe rule; it is an unfinished feature whose
+ * absence nobody noticed because the thing it responds to could not happen.
+ *
+ * The freeze comes **before** the delete and is not fenced. The whole point of
+ * B6 is that the inputs disappear: once the link row is gone the score cannot
+ * be derived from anything, and a freeze that failed silently would leave
+ * somebody reading as zero in a standing they earned. If the freeze cannot be
+ * written, the unlink does not happen.
+ */
+export async function unlinkAccountAction(form: FormData): Promise<void> {
+  const gamer = await currentGamer();
+  if (!gamer) redirect("/login?next=/settings/connections");
+
+  const accountId = String(form.get("accountId") ?? "");
+  const db = await getDb();
+
+  const { eq, and } = await import("drizzle-orm");
+  const [account] = await db
+    .select()
+    .from(schema.linkedGameAccounts)
+    .where(
+      and(
+        eq(schema.linkedGameAccounts.id, accountId),
+        eq(schema.linkedGameAccounts.userId, gamer.id),
+      ),
+    );
+  if (!account) {
+    redirect("/settings/connections?note=That+account+is+not+linked+to+you.");
+  }
+
+  const { freezeOnUnlink } = await import("../../lib/challenges/jobs.ts");
+  const frozen = await freezeOnUnlink(db, accountId);
+
+  await db.delete(schema.linkedGameAccounts).where(eq(schema.linkedGameAccounts.id, accountId));
+
+  revalidatePath("/settings/connections");
+  redirect(
+    `/settings/connections?note=${encodeURIComponent(
+      frozen === 0
+        ? "Unlinked. You had no live entries on that account."
+        : `Unlinked. Your score in ${frozen} challenge${frozen === 1 ? "" : "s"} is frozen where it was — you stay in the standings.`,
+    )}`,
+  );
 }

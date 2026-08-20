@@ -55,14 +55,6 @@ export function appId(): string | undefined {
   return env("DISCORD_APP_ID") || env("DISCORD_CLIENT_ID");
 }
 
-// Is the public key even shaped like an Ed25519 key? (64 hex characters.)
-// Pasting the Application ID or the client secret in by mistake is the single
-// most common reason Discord refuses to verify an interactions URL.
-export function publicKeyShape(): { present: boolean; length: number; looksValid: boolean } {
-  const k = publicKey();
-  return { present: !!k, length: k?.length ?? 0, looksValid: !!k && /^[0-9a-f]{64}$/i.test(k) };
-}
-
 // Can we *receive* interactions? (needs only the public key)
 export function canVerify(): boolean {
   return !!publicKey();
@@ -71,10 +63,6 @@ export function canVerify(): boolean {
 // Can we *act* — post messages, create channels, pin? (needs the bot token)
 export function canAct(): boolean {
   return !!botToken();
-}
-
-export function discordConfigured(): boolean {
-  return canVerify() && canAct() && !!appId();
 }
 
 // Public base URL used in bot links and the install redirect. Falls back to the
@@ -125,30 +113,9 @@ export function installUrl(state?: string | null): string | null {
   return `https://discord.com/oauth2/authorize?${q}`;
 }
 
-/**
- * The link every BUTTON on the site should point at (B22).
- *
- * Not the Discord URL — our own route, which mints a per-click attribution
- * token for whoever is signed in and then redirects. Public pages are cached,
- * so a Discord URL rendered into one would freeze the first visitor's token
- * into the HTML and credit them for every install after it. A route cannot be
- * frozen that way.
- *
- * `installUrl()` stays for the two places that need the literal OAuth URL: the
- * admin page that shows it for the Discord portal, and this route itself.
- */
-export function installHref(): string | null {
-  return appId() ? "/api/discord/install" : null;
-}
-
 // Shared secret for server-to-server bot endpoints, mirroring the CRON_SECRET
 // pattern already used by /api/cron/sync.
 export function botApiSecret(): string | undefined {
   return env("BOT_API_SECRET");
 }
 
-export function authorizeBotRequest(headers: Headers): boolean {
-  const secret = botApiSecret();
-  if (!secret) return false;
-  return headers.get("authorization") === `Bearer ${secret}`;
-}

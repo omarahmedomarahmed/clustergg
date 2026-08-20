@@ -23,13 +23,12 @@ import { uid } from "../../lib/core/utils.ts";
 import { eq as sqlEq } from "drizzle-orm";
 import {
   ownerStanding,
-  ownerPoolStates,
   setPayoutPreference,
   setOwnerContact,
   PAYOUT_PREFERENCES,
   CommunityBuilderRefused,
 } from "../../lib/portal/owner.ts";
-import { portalCookieName, signPayload, verifyPayload } from "../../lib/core/portal-auth.ts";
+import { grantPortalSession, signPayload, verifyPayload } from "../../lib/core/signing.ts";
 import { mayOpenPortal } from "../../lib/portal/session.ts";
 import { KPI_WEIGHTS } from "../../lib/money/amounts.ts";
 import { signUpBrand, confirmAndPay, onInvoicePaid } from "../../lib/portal/brand.ts";
@@ -63,16 +62,30 @@ async function aGuild(db: DB, guildId: string, over: Record<string, unknown> = {
 
 // ── The gate ────────────────────────────────────────────────────────────────
 
-test("a portal session is scoped to one portal, by construction", () => {
+test("a portal session is scoped to one portal, by construction", async () => {
   // The id is part of the COOKIE NAME, not only of the signature. That is what
   // makes "logged into brand A" structurally unable to mean "logged in" at
   // brand B — the browser does not even send the other portal's cookie.
-  const a = portalCookieName("brand", "brand-a");
-  const b = portalCookieName("brand", "brand-b");
-  ok(a !== b, "two brands do not share a cookie name");
-  ok(a.includes("brand-a"), "the portal's id is in the name");
+  //
+  // ===== ASSERTED THROUGH THE FUNCTION THAT WRITES IT =====
+  //
+  // This used to call `portalCookieName`, an export whose only caller was this
+  // line — `94-export-reach` named it, and the ruling on that list is that a
+  // test is not a caller. The property is real and load-bearing, so it moved
+  // rather than going: `grantPortalSession` takes the cookie jar, so the name
+  // it actually writes can be observed. That is a stronger assertion anyway —
+  // the old one proved a helper agreed with itself.
+  const written: string[] = [];
+  const jar = { set: (opts: { name: string }) => written.push(opts.name) };
 
-  const server = portalCookieName("server", "brand-a");
+  await grantPortalSession("brand", "brand-a", jar);
+  await grantPortalSession("brand", "brand-b", jar);
+  await grantPortalSession("server", "brand-a", jar);
+  const [a, b, server] = written;
+
+  eq(written.length, 3, "three sessions, three cookies");
+  ok(a !== b, "two brands do not share a cookie name");
+  ok(a.includes("brand-a"), "the portal's id is in the name the browser is given");
   ok(
     server !== a,
     "and a server portal with the same id is still a different cookie — the kind is in the name too",
@@ -276,7 +289,12 @@ test("eligibility does not move mid-week, in either direction", async () => {
   // And the other direction, which is the one that pays money: a server that
   // was not ready cannot complete its profile on Wednesday and be paid for a
   // week it was not in.
-  const late = await ownerPoolStates(db, "unknown-guild", NOW);
+  // `poolStatesFor` rather than `ownerPoolStates`, which was a one-line alias
+  // of exactly this call with no caller of its own. The portal reads the real
+  // one; the alias existed only for this line.
+  const { poolStatesFor } = await import("../../lib/pool/eligibility.ts");
+  const { weekFor } = await import("../../lib/challenges/week.ts");
+  const late = await poolStatesFor(db, "unknown-guild", weekFor(NOW).start);
   eq(late, null, "a server we have never seen has no states to report");
 });
 

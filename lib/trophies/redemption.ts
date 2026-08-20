@@ -67,7 +67,6 @@ export class RedemptionRefused extends Error {
 export {
   beginEmailVerification,
   confirmEmailVerification,
-  emailIsVerified,
   looksLikeEmail,
 } from "../identity/verify.ts";
 

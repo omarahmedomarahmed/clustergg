@@ -22,7 +22,7 @@ import { eq } from "drizzle-orm";
 import { getDb, isDemoMode, schema } from "../db/index.ts";
 import { currentGamer } from "../auth/current.ts";
 import { hasSeenAdmin } from "../discord/admin.ts";
-import { hasPortalSession } from "../core/portal-auth.ts";
+import { hasPortalSession } from "../core/signing.ts";
 import {
   guildAccessFor,
   mayWithdraw,

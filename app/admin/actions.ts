@@ -502,3 +502,95 @@ export async function retryFailedPostsAction(): Promise<void> {
     )}`,
   );
 }
+
+/**
+ * Reverse one sweep. `05-ADMIN`'s weekend routine.
+ *
+ * ===== THE PAGE SAID IT WAS REVERSIBLE AND NOTHING COULD REVERSE ONE =====
+ *
+ * `/admin/vaults/prize` has said, in words, *"it is reversible — a swept trophy
+ * is still theirs, the money has been parked"* since Sprint 9, and
+ * `reverseSweep` was written, guarded and called by nothing. A sweep with no
+ * reversal is a one-way door on somebody's money, and the page was promising
+ * the opposite.
+ *
+ * Per trophy, per holder, and never in bulk: a sweep can be run over a whole
+ * category, and a reversal is somebody looking at one holding and deciding it
+ * was wrong. A "reverse the last sweep" button would be a way to undo a
+ * decision nobody re-read.
+ */
+export async function reverseSweepAction(form: FormData): Promise<void> {
+  const who = await actor();
+  const db = await getDb();
+  const { reverseSweep } = await import("../../lib/trophies/settle.ts");
+  try {
+    await reverseSweep(db, String(form.get("userTrophyId") ?? ""), who);
+  } catch (e) {
+    back("/admin/vaults/prize", reason(e));
+  }
+  revalidatePath("/admin/vaults/prize");
+  back("/admin/vaults/prize");
+}
+
+/**
+ * Edit a trophy's name, image or brand. **Never its value.**
+ *
+ * ===== ANOTHER CLAIM WITH NO SURFACE =====
+ *
+ * `/admin/trophies` has said *"name, image and brand are editable forever, and
+ * an edit reaches every holder"* since Sprint 8, and `editTrophy` had no caller
+ * (`94-export-reach`). The second half of that sentence is the interesting one
+ * and it is free: holders point at the definition rather than copying it, so
+ * there is nothing to propagate — but only if somebody can actually edit.
+ *
+ * T8's other half is enforced in `editTrophy` itself, not here: a value is set
+ * once and never changes, so this action has no field for one. A $100 trophy is
+ * a $100 trophy forever, because the prize vault is holding exactly that much
+ * against it.
+ */
+export async function editTrophyAction(form: FormData): Promise<void> {
+  await actor();
+  const db = await getDb();
+  const { editTrophy } = await import("../../lib/trophies/trophies.ts");
+
+  const name = String(form.get("name") ?? "").trim();
+  if (!name) back("/admin/trophies", "A trophy needs a name.");
+
+  try {
+    await editTrophy(db, String(form.get("trophyId") ?? ""), {
+      name,
+      imageUrl: String(form.get("imageUrl") ?? "").trim() || null,
+    });
+  } catch (e) {
+    back("/admin/trophies", reason(e));
+  }
+  revalidatePath("/admin/trophies");
+  back("/admin/trophies");
+}
+
+/**
+ * The platform-wide ceiling on analytics pulls. `12-IDENTITY` §7a.
+ *
+ * ===== A SAFETY LIMIT NOBODY COULD MOVE =====
+ *
+ * `setPullCeiling` was written for this and had no caller, so the only way to
+ * change the ceiling was a deploy — which is the opposite of what a ceiling is
+ * for. It exists to be lowered in a hurry when a provider starts complaining,
+ * and a limit you can only change by shipping code is a limit that gets removed
+ * from the code instead.
+ *
+ * Logged against whoever moved it, because raising it is a decision somebody
+ * should be able to be asked about.
+ */
+export async function setPullCeilingAction(form: FormData): Promise<void> {
+  const who = await actor();
+  const ceiling = Number(form.get("ceiling"));
+  if (!Number.isFinite(ceiling) || ceiling < 1) {
+    back("/admin/settings", "A ceiling is a whole number of pulls a day, at least one.");
+  }
+  const db = await getDb();
+  const { setPullCeiling } = await import("../../lib/analytics/consent.ts");
+  await setPullCeiling(db, Math.round(ceiling), who);
+  revalidatePath("/admin/settings");
+  back("/admin/settings");
+}

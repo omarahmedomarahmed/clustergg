@@ -1,14 +1,27 @@
 // Stage 1 — identity.
 //
 // The rule under test is U1: **nothing accrues until an account is linked and
-// an age band and a country are set.** Stage 4's entry chain will call
-// `requireUnlocked`, and this suite is what stops that call from being
-// decorative.
+// an age band and a country are set.**
+//
+// ===== ASSERTED THROUGH THE DOOR, NOT THROUGH A HELPER =====
+//
+// This suite used to drive `requireUnlocked`, and its header said *"Stage 4's
+// entry chain will call `requireUnlocked`"*. It never did — the entry chain
+// calls `unlockState` and builds its own refusal, and `requireUnlocked` was a
+// second implementation of the same gate with no caller at all
+// (`94-export-reach`). So a suite written to stop a call being decorative was
+// itself the only thing calling it.
+//
+// It now drives `enterChallenge`, which is the door the rule actually guards.
+// That is stronger in the way that matters: the old version proved a helper
+// threw, and this proves **a gamer cannot enter** — and that the refusal names
+// which of the three steps is missing, because "complete onboarding" is a
+// shrug rather than a message.
 
 import { ok, eq, no, throws } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { resetDemoDb, schema } from "../../lib/db/index.ts";
-import { deriveUnlock, unlockState, requireUnlocked } from "../../lib/identity/unlock.ts";
+import { deriveUnlock, unlockState } from "../../lib/identity/unlock.ts";
 import {
   createGamer,
   shadowGamerForDiscord,
@@ -51,15 +64,38 @@ test("an unrecognised age band does not count as an answer", () => {
 
 test("a half-onboarded gamer cannot enter, and the refusal says why", async () => {
   const db = await resetDemoDb();
-  const id = await createGamer(db, { displayName: "Halfway" });
+  const { createChallenge } = await import("../../lib/challenges/lifecycle.ts");
+  const { enterChallenge } = await import("../../lib/challenges/entry.ts");
 
-  const err = await throws(
-    () => requireUnlocked(db, id),
-    /link/,
-    "a gamer with nothing linked is refused, naming the link step",
+  const id = await createGamer(db, { displayName: "Halfway" });
+  // A real week boundary. There is no date picker anywhere on this platform,
+  // for anyone — `createChallenge` refuses anything else, which is the rule
+  // doing its job in a fixture.
+  const { weekFor } = await import("../../lib/challenges/week.ts");
+  const challengeId = await createChallenge(db, {
+    title: "Open Now",
+    game: "League of Legends",
+    provider: "riot-lol",
+    startAt: weekFor(new Date()).start,
+    metrics: { wins: 1 },
+  });
+  // Straight to `live`, rather than through the lifecycle. The subject here is
+  // the onboarding gate, and walking a challenge through paid → scheduled →
+  // live would make this suite fail for reasons that have nothing to do with
+  // U1 — `40-challenges` owns the lifecycle and asserts every one of those
+  // transitions properly.
+  await db
+    .update(schema.challenges)
+    .set({ state: "live" })
+    .where(sqlEq(schema.challenges.id, challengeId));
+
+  const nothing = await enterChallenge(db, { challengeId, userId: id });
+  no(nothing.ok, "a gamer with nothing linked cannot enter");
+  eq(!nothing.ok ? nothing.code : "", "onboarding", "refused for onboarding, not for anything else");
+  ok(
+    !nothing.ok && /ageBand/.test(nothing.reason) && /country/.test(nothing.reason) && /link/.test(nothing.reason),
+    "and the refusal names every missing step, not just the first — age first, I7",
   );
-  eq((err as { missing?: string[] }).missing, ["ageBand", "country", "link"],
-    "and the error carries every missing step, not just the first — age first, I7");
 
   await linkAccount(db, {
     userId: id,
@@ -70,15 +106,19 @@ test("a half-onboarded gamer cannot enter, and the refusal says why", async () =
   });
   await setAgeBand(db, id, "adult");
 
-  await throws(
-    () => requireUnlocked(db, id),
-    /country/,
-    "two of three still refuses, naming the country step",
+  const twoOfThree = await enterChallenge(db, { challengeId, userId: id });
+  no(twoOfThree.ok, "two of three still refuses");
+  ok(
+    !twoOfThree.ok && /country/.test(twoOfThree.reason),
+    "naming the country step, and no longer naming the two they have done",
+  );
+  no(
+    !twoOfThree.ok && /ageBand/.test(twoOfThree.reason),
+    "which is what makes the refusal a next action rather than a status report",
   );
 
   await setCountry(db, id, "GB");
-  const state = await requireUnlocked(db, id);
-  ok(state.unlocked, "and all three lets them through");
+  ok((await unlockState(db, id)).unlocked, "and all three unlocks them");
 });
 
 test("unlock is derived, so removing a link removes the unlock", async () => {

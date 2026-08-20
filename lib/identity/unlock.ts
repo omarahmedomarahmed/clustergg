@@ -12,7 +12,7 @@
 // without anything having to remember to flip a bit.
 //
 // **This module is the only place that decides whether a gamer may enter a
-// challenge.** Stage 4's entry chain calls `requireUnlocked` and does not
+// challenge.** Stage 4's entry chain calls `unlockState` and does not
 // re-derive the answer, because a second implementation is a second answer.
 
 import { and, eq } from "drizzle-orm";
@@ -150,15 +150,15 @@ export class NotUnlockedError extends Error {
   }
 }
 
-/**
- * The gate. Throws, naming the missing steps.
- *
- * Every path that lets a gamer accrue anything — entering a challenge, holding
- * a trophy, appearing in a standing — goes through here. It throws rather than
- * returning false because a caller that ignores a boolean compiles.
- */
-export async function requireUnlocked(db: DB, userId: string): Promise<UnlockState> {
-  const state = await unlockState(db, userId);
-  if (!state.unlocked) throw new NotUnlockedError(state.missing);
-  return state;
-}
+// ===== `requireUnlocked` AND `NotUnlockedError` WERE DELETED HERE =====
+//
+// A second implementation of a gate the entry chain already applies. K12's
+// shape: `lib/challenges/entry.ts:108` calls `unlockState` directly and returns
+// a refusal carrying the missing steps by name, which is the better answer —
+// an exception cannot tell somebody *"still needed: age band, country"*.
+//
+// This file's own header said *"Stage 4's entry chain calls `requireUnlocked`
+// and does not…"*. It did not, and had never. A comment describing a call that
+// does not happen is worse than no comment: the next person reads it as the
+// enforcement point and adds their door beside it.
+

@@ -330,10 +330,3 @@ export async function challengesToClose(db: DB, now = new Date()) {
     );
 }
 
-/** Announced or live — the two states a gamer may join (guard 2 of the chain). */
-export async function joinableChallenges(db: DB, now = new Date()) {
-  return db
-    .select()
-    .from(schema.challenges)
-    .where(and(gt(schema.challenges.endAt, now), eq(schema.challenges.state, "live")));
-}

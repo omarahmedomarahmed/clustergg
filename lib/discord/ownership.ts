@@ -140,12 +140,3 @@ export async function seeAdmin(
   });
 }
 
-export async function adminsSeenFor(db: DB, guildId: string) {
-  return db.select().from(schema.guildAdmins).where(eq(schema.guildAdmins.guildId, guildId));
-}
-
-/** The guilds this Discord identity owns, as far as we know. */
-export async function guildsOwnedBy(db: DB, discordId: string | null | undefined) {
-  if (!discordId) return [];
-  return db.select().from(schema.guilds).where(eq(schema.guilds.ownerDiscordId, discordId));
-}

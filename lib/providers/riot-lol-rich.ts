@@ -87,59 +87,6 @@ export type LolSnapshot = {
 const snapCache = new Map<string, { v: LolSnapshot; exp: number }>();
 const matchCache = new Map<string, { v: LolMatchDetail; exp: number }>();
 
-// Full snapshot for one account: profile icon, level, live game, top champions,
-// recent matches. Cached ~5 min per puuid.
-export async function getLolSnapshot(puuid: string, platform: string): Promise<LolSnapshot> {
-  const key = process.env.RIOT_API_KEY;
-  if (!key) return emptySnap("Live League data isn't configured yet.");
-  const ck = `${platform}:${puuid}`;
-  const hit = snapCache.get(ck);
-  if (hit && hit.exp > Date.now()) return hit.v;
-
-  const cluster = riotCluster(platform);
-  let dd: { version: string; byId: Map<number, Champ> };
-  try { dd = await dataDragon(); } catch { dd = { version: "14.1.1", byId: new Map() }; }
-  const nameOf = (id: number) => dd.byId.get(id)?.name ?? `Champion ${id}`;
-  const ddId = (id: number, fallback?: string) => dd.byId.get(id)?.id ?? fallback ?? "";
-
-  // Summoner (profile icon + level), mastery, and match ids in parallel — each isolated.
-  const [summoner, masteryRaw, matchIds] = await Promise.all([
-    rj<any>(`https://${platform}.api.riotgames.com/lol/summoner/v4/summoners/by-puuid/${puuid}`, key).catch(() => null),
-    rj<any[]>(`https://${platform}.api.riotgames.com/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=5`, key).catch(() => []),
-    rj<string[]>(`https://${cluster}.api.riotgames.com/lol/match/v5/matches/by-puuid/${puuid}/ids?start=0&count=5`, key).catch(() => []),
-  ]);
-
-  const champions: LolChampion[] = (masteryRaw ?? []).map((m) => {
-    const id = Number(m.championId);
-    const idStr = ddId(id);
-    return {
-      championId: id, name: nameOf(id), iconUrl: champIconUrl(dd.version, idStr), splashUrl: champSplashUrl(idStr),
-      level: Number(m.championLevel ?? 0), points: Number(m.championPoints ?? 0),
-      lastPlayed: m.lastPlayTime ? Number(m.lastPlayTime) : null,
-      masteryTitle: MASTERY_TITLE[Number(m.championLevel ?? 0)] ?? "",
-      tokensEarned: m.tokensEarned != null ? Number(m.tokensEarned) : undefined,
-      chestGranted: m.chestGranted ?? undefined,
-    };
-  });
-
-  // Match details (last 5) — parallel, each isolated. Immutable, so cache long.
-  const matches = (await Promise.all(
-    (matchIds ?? []).slice(0, 5).map((mid) => matchSummaryFor(mid, puuid, cluster, key, dd)),
-  )).filter((m): m is LolMatchSummary => !!m);
-
-  // Live game (SPECTATOR-V5) — 404 when not in a game.
-  const live = await getLolLive(puuid, platform, key, dd);
-
-  const snap: LolSnapshot = {
-    ok: true,
-    profileIconUrl: summoner?.profileIconId != null ? profileIconUrl(dd.version, Number(summoner.profileIconId)) : null,
-    summonerLevel: summoner?.summonerLevel != null ? Number(summoner.summonerLevel) : null,
-    live, champions, matches,
-  };
-  snapCache.set(ck, { v: snap, exp: Date.now() + 5 * 60_000 });
-  return snap;
-}
-
 async function getLolLive(puuid: string, platform: string, key: string, dd: { version: string; byId: Map<number, Champ> }): Promise<LolLive | null> {
   try {
     const g = await rj<any>(`https://${platform}.api.riotgames.com/lol/spectator/v5/active-games/by-summoner/${puuid}`, key, 5000);

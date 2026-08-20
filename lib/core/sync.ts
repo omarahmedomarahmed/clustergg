@@ -488,27 +488,3 @@ export async function forceSync(
   return syncAccount(db, account, opts);
 }
 
-/** On-demand sync with a cooldown, for a profile page view. */
-export async function syncUserAccountsIfStale(
-  db: DB,
-  userId: string,
-  cooldownMin = 15,
-): Promise<void> {
-  const cutoff = new Date(Date.now() - cooldownMin * 60_000);
-  const accounts = await db
-    .select()
-    .from(schema.linkedGameAccounts)
-    .where(
-      and(
-        eq(schema.linkedGameAccounts.userId, userId),
-        or(
-          isNull(schema.linkedGameAccounts.lastSyncAt),
-          lt(schema.linkedGameAccounts.lastSyncAt, cutoff),
-        ),
-      ),
-    );
-  // Skip accounts that need a manual reconnect — their token is dead and their
-  // observations are already preserved. Retrying just spends API calls.
-  const syncable = accounts.filter((a) => a.syncStatus !== "needs_reconnect");
-  await Promise.allSettled(syncable.map((a) => syncAccount(db, a)));
-}

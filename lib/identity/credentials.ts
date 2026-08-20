@@ -199,23 +199,3 @@ export async function gamerByEmail(db: DB, email: string) {
   return user ?? null;
 }
 
-/**
- * Every OTHER account that shares nothing with this one but the person.
- *
- * Used by exactly one thing: a line on the settings page saying *"you also
- * have an account signed in with Discord"*, so somebody who made two is not
- * confused about which they are looking at. It is **information, not a
- * merge affordance** — there is no button next to it, by design.
- */
-export async function otherAccountsHint(
-  db: DB,
-  userId: string,
-  email: string | null,
-): Promise<number> {
-  if (!email) return 0;
-  const rows = await db
-    .select({ id: schema.users.id })
-    .from(schema.users)
-    .where(and(eq(schema.users.email, normaliseEmail(email)), ne(schema.users.id, userId)));
-  return rows.length;
-}

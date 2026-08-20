@@ -23,7 +23,7 @@ import {
   formatMoney,
 } from "../../lib/money/amounts.ts";
 import { balanceOf, allBalances, post, ledgerBalances, routePaidInvoice } from "../../lib/money/ledger.ts";
-import { createInvoice, issueInvoice, markPaid, invoiceView, isInvoicePaid } from "../../lib/money/invoices.ts";
+import { createInvoice, markPaid, invoiceView, isInvoicePaid } from "../../lib/money/invoices.ts";
 import {
   allocateToPool,
   maxAllocationCents,
@@ -175,12 +175,14 @@ test("routing refuses an invoice that has not been paid", async () => {
     payerType: "brand",
     lines: [{ description: "Not paid for", amountCents: CHALLENGE_PRICE_CENTS }],
   });
-  await issueInvoice(db, invoiceId);
-
+  // No `issueInvoice` call: it set a status nothing ever read and had no
+  // caller anywhere (`94-export-reach`), and the property under test is
+  // **unpaid**, which a freshly created invoice already is. Calling it added a
+  // state to the fixture that production could not reach.
   await throws(
     () => routePaidInvoice(db, invoiceId),
     /does not reach a vault/,
-    "an issued, unpaid invoice does not move a cent",
+    "an unpaid invoice does not move a cent",
   );
   eq(await balanceOf(db, "prize"), 0, "and the vaults are untouched");
 });

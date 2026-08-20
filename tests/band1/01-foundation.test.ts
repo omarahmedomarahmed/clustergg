@@ -9,8 +9,9 @@ import { ok, eq } from "../helpers/assert.ts";
 import { test } from "../helpers/suite.ts";
 import { getDb, isDemoMode, isNeonUrl, schema, resetDemoDb } from "../../lib/db/index.ts";
 import { withTx, lockGamer } from "../../lib/db/tx.ts";
-import { uid, slugify, slugifyOr } from "../../lib/core/utils.ts";
+import { uid, slugify } from "../../lib/core/utils.ts";
 import { eq as sqlEq, sql } from "drizzle-orm";
+import { createGamer } from "../../lib/identity/gamers.ts";
 
 test("the band runs against an in-process database and needs nothing running", () => {
   ok(isDemoMode, "no DATABASE_URL is set, so the suite owns its own database");
@@ -105,11 +106,26 @@ test("the ported slug helper does not turn a non-Latin name into 'gamer'", () =>
   eq(slugify("Café Player"), "cafe-player", "accents decompose rather than vanish");
   eq(slugify("Привет"), "privet", "Cyrillic transliterates to something readable");
   eq(slugify("日本語ゲーマー"), "", "a script with no transliteration returns empty, honestly");
-  eq(
-    slugifyOr("日本語サーバー", "server-4f2a"),
-    "server-4f2a",
-    "and the caller supplies a fallback that says what the thing is",
-  );
+});
+
+test("a gamer whose name does not transliterate still gets a slug that says what they are", async () => {
+  // ===== THE FALLBACK, ASSERTED WHERE IT ACTUALLY HAPPENS =====
+  //
+  // This used to call `slugifyOr` — a helper whose only caller was this line
+  // (`94-export-reach`). The live fallback is inside `freeSlug`, which
+  // `createGamer` uses, so the property is now asserted through the door: an
+  // empty transliteration must not produce the bare word, because the first
+  // such person would occupy `/u/gamer` permanently.
+  const db = await resetDemoDb();
+  const id = await createGamer(db, { displayName: "日本語ゲーマー" });
+  const [row] = await db
+    .select({ slug: schema.users.slug })
+    .from(schema.users)
+    .where(sqlEq(schema.users.id, id));
+
+  ok(row.slug.length > 0, "they get a slug");
+  eq(row.slug, `gamer-${id.toLowerCase().slice(0, 6)}`, "which says what the thing is");
+  ok(row.slug !== "gamer", "and never the bare word, which one person would own forever");
 });
 
 test("the demo database can be reset between fixtures", async () => {

@@ -13,6 +13,7 @@ import { currentGamer } from "../../../lib/auth/current.ts";
 import { accountsFor } from "../../../lib/identity/accounts.ts";
 import { discordConfigured } from "../../../lib/auth/discord.ts";
 import { Panel, Button } from "../../ui.tsx";
+import { unlinkAccountAction } from "../actions.ts";
 
 export const dynamic = "force-dynamic";
 
@@ -96,12 +97,30 @@ export default async function Connections({
                   {a.inGameName ?? a.providerAccountId}
                   <span className="ml-2 text-xs text-mute">{a.provider}</span>
                 </span>
-                {/* C5 — never the word "verified" unless ownership was proven.
-                    `exists` means the account exists, which is a different claim. */}
-                <span className="text-xs text-mute">
-                  {["icon", "oauth", "openid", "admin"].includes(a.verifiedMethod)
-                    ? "ownership proven"
-                    : "linked"}
+                <span className="flex items-center gap-3">
+                  {/* C5 — never the word "verified" unless ownership was proven.
+                      `exists` means the account exists, which is a different claim. */}
+                  <span className="text-xs text-mute">
+                    {["icon", "oauth", "openid", "admin"].includes(a.verifiedMethod)
+                      ? "ownership proven"
+                      : "linked"}
+                  </span>
+                  {/*
+                    B6's trigger. There was no way to unlink an account anywhere
+                    on the platform, which is why `freezeOnUnlink` — the rule
+                    that keeps somebody in a standing they earned — had no
+                    caller. Unlinking freezes the score first and says so.
+                  */}
+                  <form action={unlinkAccountAction}>
+                    <input type="hidden" name="accountId" value={a.id} />
+                    <button
+                      type="submit"
+                      className="text-xs text-mute underline hover:text-white"
+                      data-testid="unlink-account"
+                    >
+                      Unlink
+                    </button>
+                  </form>
                 </span>
               </li>
             ))}

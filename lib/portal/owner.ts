@@ -558,14 +558,3 @@ export async function ownerMembers(db: DB, guildId: string) {
     );
 }
 
-/**
- * E2 — the portal always shows **two states**.
- *
- * *"In this week's pool"* and *"on track for next week"* answer different
- * questions, and an owner who only saw the first would have no way to tell
- * whether the work they did on Wednesday achieved anything. The second is what
- * makes the gate feel like something they can act on rather than a verdict.
- */
-export async function ownerPoolStates(db: DB, guildId: string, now = new Date()) {
-  return poolStatesFor(db, guildId, weekFor(now).start);
-}

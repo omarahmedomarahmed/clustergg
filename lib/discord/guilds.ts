@@ -148,13 +148,6 @@ export function refreshAllowedAt(lastRefreshAt: Date | null): Date | null {
   return lastRefreshAt ? new Date(lastRefreshAt.getTime() + REFRESH_COOLDOWN_MS) : null;
 }
 
-export async function markGuildRemoved(db: DB, guildId: string, now = new Date()): Promise<void> {
-  await db
-    .update(schema.guilds)
-    .set({ removedAt: now })
-    .where(eq(schema.guilds.guildId, guildId));
-}
-
 /** Every guild with the bot, most recently installed first. */
 export async function installedGuilds(db: DB) {
   return db
