@@ -1911,3 +1911,33 @@ number. The guard was right to be suspicious: the fix is the helper's name, not
 an allowlist entry, because that list is for names which really are columns.
 Its explanation had to be reworded too, since that guard does not strip
 comments and a comment quoting the pattern **is** the pattern.
+
+## Sprint 16 · the two missing pages, and public/
+
+| # | Guard | The break | What went red | Restored |
+|---|---|---|---|---|
+| 281 | **The spec's PAGE list is actually being read** (`94-reachability`, E21) | — | the canary: 21 routes parsed, `/pool` and `/redeem` among them, the dynamic ones flattened. A guard over an empty list is decoration | — |
+| 282 | **Every page route the spec promises resolves** (`94-reachability`, E21) | deleted `app/brands/` | this guard, naming `/brands` | clean, 10/10 |
+| 283 | **A missing asset is the designed placeholder** (`97-assets`, D23) | made `assetUrl` return the placeholder for everything | *"and an upload path is served"* — the negative half, which a resolver that refuses everything would otherwise pass | clean |
+| 284 | **Never a hotlink** (`97-assets`, D22) | made `assetUrl` pass any URL through | *"a hotlink to a provider's CDN is not an asset this platform serves"* | clean |
+| 285 | **The fenced image has both halves** (`97-assets`) | — | `assetUrl` before the request and `onError` after it, and the handler stops at the placeholder rather than looping when that 404s too | — |
+
+### What the page guard found: exactly two, and nothing else
+
+The E21 guard was committed red and named `/brands` and `/servers` — the two
+`14-EDITABLE` §7 already knew about, and **nothing beyond them.** So there is
+nothing in `04-SURFACES` that we dropped in the pivot and forgot to unwrite,
+which was the thing worth checking before building anything from that list.
+
+`/brands` had no page and no other door either: `signUpBrand`'s only caller was
+the demo seeder, so the entire commercial funnel began at a URL that 404'd and
+there was no way to create a brand at all.
+
+### And one thing the layout was quietly duplicating
+
+`app/layout.tsx`'s meta description was `COPY.tagline` typed out word for word.
+House rule 2's shape with no figure in it: two copies of one sentence, and the
+day somebody edits the homepage the search result still says the old thing.
+Imported now — the code default rather than the live store, because metadata is
+read on every page and a content-store round trip for a meta tag is a query on
+every request for a sentence nobody sees.

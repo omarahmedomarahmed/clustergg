@@ -1,6 +1,6 @@
 // What the public pages read. One place, so no page invents a query.
 
-import { and, desc, eq, gt, or, sql } from "drizzle-orm";
+import { and, desc, eq, gt, isNull, or, sql } from "drizzle-orm";
 import { getDb, schema } from "../db/index.ts";
 import { weekFor, weekStartPlus, phaseAt } from "../challenges/week.ts";
 import { standingsOf } from "../challenges/scoring.ts";
@@ -302,4 +302,45 @@ export async function gameBySlug(slug: string) {
     .orderBy(desc(schema.challenges.startAt));
 
   return { provider, live: isProviderLive(provider), challenges };
+}
+
+/**
+ * The server index. `04-SURFACES` §1 — *"every server with the bot and a
+ * complete profile — games, member range, bio, and a Join button. How a gamer
+ * finds one."*
+ *
+ * ===== "A COMPLETE PROFILE" IS THE FILTER, AND IT IS NOT COSMETIC =====
+ *
+ * A server we cannot describe is a server a gamer cannot choose between, so an
+ * incomplete one is absent rather than listed with three empty fields. It is
+ * the same completeness `12-IDENTITY` §5 makes a pool gate — one definition,
+ * read here rather than re-expressed, because two answers to "is this server
+ * ready" is how a server appears in the directory and earns nothing.
+ *
+ * Removed servers are gone (S9 freezes their reach), and the order is by
+ * member count so the biggest communities are the first thing somebody sees.
+ */
+export async function publicServers() {
+  const db = await getDb();
+  const { profileCompleteness } = await import("../pool/eligibility.ts");
+
+  const rows = await db
+    .select()
+    .from(schema.guilds)
+    .where(isNull(schema.guilds.removedAt))
+    .orderBy(desc(schema.guilds.memberCount));
+
+  return rows
+    .filter((g) => profileCompleteness(g).complete)
+    .map((g) => ({
+      guildId: g.guildId,
+      slug: g.slug,
+      name: g.name,
+      memberCount: g.memberCount,
+      community: g.community,
+      memberAgeRange: g.memberAgeRange,
+      gamesPlayed: g.gamesPlayed ?? [],
+      inviteUrl: g.inviteUrl,
+      coverImageUrl: g.coverImageUrl,
+    }));
 }

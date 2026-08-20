@@ -137,3 +137,8 @@ export function PageArtLayer({
     </div>
   );
 }
+
+// `Art` lives in `app/art.tsx`, and has to: D23's second fence is an `onError`
+// handler, which is a client concern, and this file exports an async server
+// component (`Nav`) that cannot live in a client module.
+export { Art } from "./art.tsx";

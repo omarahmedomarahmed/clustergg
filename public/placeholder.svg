@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 400 210" role="img" aria-label="Artwork is not available">
+  <rect width="400" height="210" rx="12" fill="#0b0d26"/>
+  <rect x="0.5" y="0.5" width="399" height="209" rx="12" fill="none" stroke="#26262e"/>
+  <circle cx="200" cy="88" r="26" fill="none" stroke="#38bdf8" stroke-width="3"/>
+  <circle cx="200" cy="62" r="7" fill="#38bdf8"/>
+  <text x="200" y="146" text-anchor="middle" font-family="system-ui, sans-serif" font-size="15" fill="#9aa0c3">Artwork is on its way</text>
+</svg>
